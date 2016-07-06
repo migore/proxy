@@ -1,24 +1,22 @@
 # Proxy
 
-**TODO: Add description**
+A small proxy that I hakcked that caches responses. The goal is to be used for development so that you can edit responses as needed.
 
-## Installation
+## How to use it
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed as:
+Change `config/config.exs` and add the base url for the site that you want.
 
-  1. Add `proxy` to your list of dependencies in `mix.exs`:
+Run it with:
 
-    ```elixir
-    def deps do
-      [{:proxy, "~> 0.1.0"}]
-    end
-    ```
+    mix deps.get
+    mix serve
 
-  2. Ensure `proxy` is started before your application:
+Set the base url of your application to your machine IP, port 4001. Example for localhost:
 
-    ```elixir
-    def application do
-      [applications: [:proxy]]
-    end
-    ```
+    http://localhost:4001/
 
+The file with the response of each request will be in a directory called `cache` in the root of the project.
+
+## Disclaimer
+
+Even though it's not a fork of [José Valim's proxy](https://github.com/josevalim/proxy), this is based on that repository and there is code from that repository in this project.
