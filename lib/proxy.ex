@@ -19,22 +19,41 @@ defmodule Proxy do
     body = body(conn)
     headers = headers()
     params = params(conn)
+    cookies =  cookies(conn)
+    opts = Keyword.merge(params, cookies)
 
     name = :crypto.hash(:sha256, [method, url, body, "#{inspect headers}", "#{inspect params}"]) |> Base.encode16
 
-    response_body = if File.exists?("cache/" <> name) do
-      IO.puts "From cache"
-      File.read!("cache/" <> name)
+    {resp_headers, resp_body} = if File.exists?("cache/" <> name) do
+      IO.puts "From cache: #{name}"
+      {nil, File.read!("cache/" <> name) |> String.trim()}
     else
-      IO.puts "Real call"
-      response_body = call_service(method, url, body, headers, params)
+      IO.puts "Real call: #{url}"
+      {response_headers, response_body} = call_service(method, url, body, headers, opts)
       File.write("cache/" <> name, response_body)
-      response_body
+      {response_headers, response_body}
+    end
+
+    [hackney: [cookie: [resp_cook]]] = cookies
+
+    conn = if response_headers != nil do
+      c = Enum.filter(response_headers, fn({k, v}) -> k == "Set-Cookie" end) |>
+          Enum.map(fn({k,v}) -> Plug.Conn.Cookies.decode(v) end)
+
+      if c != [] do
+        [c1 | _] = c
+        conn
+        |> put_resp_cookie("session", c1["session"])
+      else
+        conn
+      end
+    else
+      conn
     end
 
     conn
     |> put_resp_header("content-type", "application/json; charset=utf-8")
-    |> send_resp(200, response_body)
+    |> send_resp(200, resp_body)
   end
 
   defp url(conn) do
@@ -51,6 +70,12 @@ defmodule Proxy do
     [{"Content-Type", "application/json"}]
   end
 
+  defp cookies(conn) do
+    conn = fetch_cookies(conn)
+    cookies = Enum.reduce(conn.cookies, "", fn({k, v}, acc) -> acc <> k <> "=" <> v <> "; " end)
+    [hackney: [cookie: [ cookies ]]]
+  end
+
   defp params(conn) do
     query_params = fetch_query_params(conn).query_params
     [params: query_params]
@@ -58,6 +83,6 @@ defmodule Proxy do
 
   defp call_service(method, url, body, headers, params) do
     {:ok, response} = HTTPoison.request(method, url, body, headers, params)
-    response.body
+    {response.headers, response.body}
   end
 end
